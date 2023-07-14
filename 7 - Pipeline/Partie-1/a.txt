@@ -1,0 +1,77 @@
+1.1 Analyse du processeur
+-------------------------
+1. Dans le circuit non-pipeliné, les opérations se réalisaient d'une seule étape. Tandis que dans le circuit pipeliné, les opérations avancent d'un étage à chaque coup de clock. 
+   Il y'a une différence de 2 coups de clock entre les fetch et l'execute (qui est l'endroit où est calculé l'adresse de saut dans le bloc mult_2). 
+   On réalise alors une incrémentation à chaque étage, ce qui permet de remplacer le fait de faire une seule incrémentation d'un seul coup de clock dans un circuit normal.
+2. Comme dit dans la consigne tous les signaux passent par tous les blocs même s'ils n'y sont pas utilisés, afin de s'assurer que les informations de contrôle arrivent au même temps que les données
+3. C'est pour garantir le principe de Forwarding et c'est aussi à cause du pipeline qui décale les données. De cette manière, l'ifnoramtion arrive au même moment que le reste dans le memory_access
+4. S'il y'a une dépendance qui provoque un aléa et donc qu'il faut bloquer le pipeline. 
+   Le système hazard_detection permet de désactiver les étages nécessaires et donc leur bus de contrôle sera à 0 pour qu'ils n'effectuent aucune opération.
+5. ça rajouterait une étape dans le circuit du Pipeline. Il faudrait aller faire des modifications dans la manière dont son relier les blocs.
+
+1.2 Test du processeur
+----------------------
+1. Oui, le programme s'exécute parfaitement
+2. 18 coups d'horloge
+
+1.3 Assembleur: dépendances des données 
+--------------------------------------------------------
+
+MAIN_START:
+MOV r0, #1 
+MOV r1, #2
+MOV r2, #6
+STRH r0, [r1, #4] @WAW r0 || RAW r1		2x NOP
+ADD r4, r2, #1    @RAW r2			0x NOP
+ADD r3, r2, #4    @RAW r2			0x NOP
+SUB r4, r1, r0    @WAW R4 || RAW r1		0X NOP
+ADD r0, r0, #5    @WAW r0 || RAW r0		0X NOP
+LSL r2, r2, #1    @WAW r2 || RAW r2 		0X NOP
+LSL r2, r2, #1    @WAW r2 || RAW r2		3X NOP
+B PART_2
+
+
+1. Quelles dépendances posent des problèmes d’aléas ?
+	STRH r0, [r1, #4]  C'EST r1
+	LSL r2, r2, #1     C'EST r2
+
+2. Combien de cycles sont nécessaires pour résoudre un aléa de donnée ?
+	Il faut 3 cycles pour résoudre un aléa de donnée. 
+
+3. Quelle est l’IPC ? Le throughput si la clock vaut 4KHz? La latence ?
+	10 instructions et 19 cycles pour toutes les réaliser
+
+	IPC = 0.52 --> 10 instructions / 19 cycles
+	Débit = 0.52 instr/cycle * 4000 cycles/sec = 2080 instr/cycle
+	Latence = 1/Débit = 1/2080 = 0,00048077 sec = 0,480 ms
+
+1.4 Assembleur : aléas de contrôle
+-------------------------------------------
+1. Il faut exactement 4 cycles (NOP) pour éviter un aléa de contrôle comme le montre le premier chronogramme sans les NOP
+2. 
+	IPC = 0.52 --> 10 instructions / 19 cycles
+	Débit = 0.52 instr/cycle * 4000 cycles/sec = 2080 instr/cycle
+	Latence = 1/Débit = 1/2080 = 0,00048077 sec = 0,480 ms
+
+2.1 Circuit control_hazard
+---------------------------------
+1. 4
+2. Pour s'assurer que le programme n'execute pas l'instruction qui suiverait. Typiquement dans le cas d'un saut qui devrait être réalisé.
+3. Lors de l'exécution d'une instruction de branchement conditionnel, on dit que le branchement est pris si la condition est vérifiée et que le programme se poursuit effectivement à la nouvelle adresse.
+4. L'aléa de donnée est prioritaire, car il faut que l'on ait les bonnes valeurs dans les registres avant de faire un calcul d'adresses.
+
+
+2.2 Circuit hazard_detection
+----------------------------
+1. Les instructions de branchement
+2. On remarque que le fetch est directement impacté, car il est branché au signal directement. Tandis que le reste des signaux ont des registres avant, donc ils sont décalés de certains coup de clock.
+3.Le pipeline s'interompt et le programme se poursuivera à la nouvelle adresse donc à la nouvelle instruction.
+4. Cela nous permet d'identifier si l'instruction précédente était un saut et s'il faut bloquer le pipeline pour que celui-ci puisse avoir le temps de s'exécuter.
+5. Car on ne va pas prendre en compte les aléas de données 
+
+
+2.3 Test aléas de contrôle
+--------------------------
+1. Oui, elles le sont. On arrête le pipeline au fetch de la prochaine instruction, mais celle-ci n'est pas traitée si un saut est effectué.
+2. IPC = 0.47 = 10/21 
+3. BL est composé de deux sous-instructions avec le msb et le lsb. msb écrit dans le LR et lsb ira lire dans ce même registre, ce qui génère un aléa de données. Pour l'aléa de contrôle c'est simplement que BL est un saut.

@@ -1,0 +1,72 @@
+1.1 Circuit data_hazard
+------------------------------
+1. On compare les registres devant être accédés par l'instruction avec les registres accédés aux différentes étapes du Pipeline précédemment.
+   On stocke notamment l'adresse en sortie d'execute, du memory access et lors du write-back.
+
+2. Oui, car si on a pas encore écrit le résultat en mémoire alors on peut avoir un problème lorsque l'on récupère l'information.
+
+3. On mémorise le registre de destination à chaque fois, pour savoir s'il y'a eu une dépendance RAW où le problème est que l'on ait écrit dans un registre et que celui-ci soit accéder.
+   Il faut aussi sauvegarder l'information qui nous permet de savoir si l'instruction va écrire dans le registre D. Donc on sauvegarde l'enable de la banque de registre.
+
+4. C'est grâce à l'entrée reg_bank_write qui nous signale qu'un registre de destination devra être utilisé.
+
+1.2 Circuit hazard_detection
+------------------------------------
+1. Se référer au laboratoire execute où on nous indique quand est-ce que les différents registres doivent être utilisés.
+    N       : Lorsque sel_operand_1_s est désactivé, alors on utilise le registre N.
+    M       : Lorsque sel_operand_2_s est désactivé, alors on utilise le registre M.
+    Mem     : str_data_s indique que l'on va écrire dans la mémoire nous permet de déterminer si le registre Mem est utilisé.
+
+2. Le registre de destination est utilisé si le signal no_data_hazard_s est à 0.
+
+3. La détection arrête le Decode de l'instruction qui pose problème, ça propagera l'arrêt du pipeline pour les enables suivants.
+
+1.3 Test aléas de donnée
+--------------------------------
+1. Oui toutes les valeurs sont correctes
+
+2. BL est composé de deux sous-instructions avec le msb et le lsb. 
+   msb écrit dans le LR et lsb ira lire dans ce même registre, ce qui génère un aléa de données. 
+   Pour l'aléa de contrôle c'est simplement que BL est un saut.
+
+3. 8 coups de clock sont nécessaires pour exécuter un BL.
+
+4. IPC = 11/31 = 0.41 inst/cycle
+
+--------------------------------------------------------------
+*                       Forwarding                           *
+--------------------------------------------------------------
+
+2.1 Circuit data_hazard
+-----------------------
+1. Flag qui indique que le bloc memory access a été utilisé
+
+2. Oui, c'est possible, mais ça serait inutile à mon avis. 
+   Si on peut déjà récupérer les données avant qu'elles soient écrites alors on a pas besoin des les récupérer après.
+
+3. On veut lire un registre où l'information est encore dans le Pipeline (Execute ou Memory Access) et qu'elle n'a pas été écrite dans les registres finaux.
+   Il est utile lorsque un instruction veut accéder à une information qui a été modifiée dans les instructions précédentes et que celle-ci n'est pas encore écrite dans son registre de destination.
+
+4. Cela permet de diminuer la charge des aléas, étant  donné qu'il ne faut plus attendre autant de temps pour pouvoir traiter une instruction dépendante.
+   On pourrait même dire que ça les élimines totalement dans les cas extrêmes où il n'y a pas de LOAD.
+
+2.2 Circuit execute
+-------------------
+1. Pour pouvoir ré-utiliser les valeurs qui sont dans le pipeline aux stages Execute et Memory Access si besoin.
+
+2. Dans le cas de LAOD qui vont lire des informations dans la mémoire de données et que l'on souhaite accéder à cette information, mais qu'elle n'est pas encore dans son registre final. 
+
+3. Rajouter le même mécanisme de sélection comme pour les deux autres parties (MUX).
+
+2.3 Test : pipeline forwarding
+------------------------------
+1. Non, le processeur fournit ne fonctionne pas correctement. Le forwarding ne s'exécute pas comme il le devrait.
+
+2.
+   IPC = 13/31 = 0.41 instr/cycle
+   Débit = 0.41 * 4000 = 1677 inst/secs
+   Latence = 1/Débit = 1/1793 = 0.59 ms
+
+3. 8 cycles
+
+4. A priori, on pourrait empiler plusieurs mêmes architectures pour qu'elles fonctionnent en parallèles.
